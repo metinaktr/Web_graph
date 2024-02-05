@@ -1,5 +1,6 @@
 from flask import Flask, render_template,request
 import pickle
+import json
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -12,6 +13,9 @@ app = Flask(__name__, template_folder="./static/")
 def websearch():
     return render_template("websearch.html")
 
+@app.route("/imagesearch")
+def imageserach():
+      return render_template("imagesearch.html")  
 
 
 @app.route("/a")
@@ -53,7 +57,7 @@ def web_search():
             similarities=cosine_similarity(query_vector,tfidf_vectors)
             
             if all_zeros(similarities[0]):
-                return  render_template('notfounf.html')
+                return  render_template('notfound.html')
             #print(similarities)
             
             G = nx.DiGraph()
@@ -72,6 +76,37 @@ def web_search():
 
             return render_template("results.html", data=[top_results,query])
 
+
+
+@app.route("/search_images", methods=['GET','POST'])
+def search_images():
+    if request.method=='POST':
+        query=request.form['query'].lower()
+        
+        if query=='':
+            return render_template('imagesearch.html')
+        
+        with open('images.json','r') as f:
+            images=json.load(f)
+        
+        results=[]
+        for img in images:
+            if query in img['alt_text'] or query in img['title']:
+                 results.append(img)
+            else:
+                continue
+                
+        if len(results)==0:
+            return render_template('notfound.html')
+      #  print(results)
+                    
+        return render_template("imageresults.html", data=[results,query])
+         
+  
+            
+            
+        
+    
 def load_tokenized_text(filename):
     tokenized_text=pickle.load(open(filename,'rb'))
     return tokenized_text
