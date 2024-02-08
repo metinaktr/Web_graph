@@ -3,7 +3,12 @@ import pickle
 import json
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-
+import numpy as np
+from PIL import Image
+from feature_extractor import FeatureExtractor
+from datetime import datetime
+from pathlib import Path
+import sys
 
 import networkx as nx
 
@@ -16,6 +21,10 @@ def websearch():
 @app.route("/imagesearch")
 def imageserach():
       return render_template("imagesearch.html")  
+
+@app.route("/reverseimagesearch")
+def reverseimagesearch():
+    return render_template("reverseimagesearch.html")
 
 
 @app.route("/a")
@@ -102,10 +111,49 @@ def search_images():
                     
         return render_template("imageresults.html", data=[results,query])
          
-  
+fe=FeatureExtractor()
+features=[]
+img_paths=[]
+
+for feature_path in Path("./static/feature").glob("*.npy"):
+    features.append(np.load(feature_path))
+    img_paths.append(Path("./static/reverse_img_store") / (feature_path.stem + ".jpg"))
+features = np.array(features)     
             
-            
+@app.route("/reverseimagesearchresult", methods=['GET','POST']) 
+def reverseimagesearchresult():
+    if request.method=='POST':
+        file=request.files['query_img']
         
+        #save query image
+        
+        img=Image.open(file.stream) #PIL image
+        uploaded_img_path='./static/uploaded/'+ \
+                            datetime.now().isoformat().replace(":",'.')\
+                            + "_" + file.filename
+        img.save(uploaded_img_path)
+        
+        #run search
+        query=fe.extract(img)
+        print(query)
+        
+        dists = np.linalg.norm(features-query, axis=1)  # L2 distances to features
+        
+        ids=np.argsort(dists)[:3]
+        
+        scores=[(dists[id],img_paths[id]) for id in ids]
+        
+        return render_template('reverseimagesearch.html',
+                               query_path=uploaded_img_path,
+                               scores=scores)
+    
+ 
+    else:
+        
+        return render_template('reverseimagesearch.html')
+        
+    
+                                 
     
 def load_tokenized_text(filename):
     tokenized_text=pickle.load(open(filename,'rb'))
